@@ -1,12 +1,36 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { z } from 'zod';
+import { promises as fs } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 const server = new McpServer({
     name: 'task-mcp-server',
     version: '1.0.0'
 });
-// Simple in-memory storage
+// Persisted storage (falls back to in-memory if file is missing/corrupt)
 let tasks = [];
 let nextId = 1;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const dataFile = path.resolve(__dirname, '../data/tasks.json');
+async function loadTasks() {
+    try {
+        const raw = await fs.readFile(dataFile, 'utf8');
+        const parsed = JSON.parse(raw);
+        tasks = Array.isArray(parsed.tasks) ? parsed.tasks : [];
+        nextId = typeof parsed.nextId === 'number'
+            ? parsed.nextId
+            : tasks.reduce((max, t) => Math.max(max, t.id), 0) + 1;
+    }
+    catch {
+        tasks = [];
+        nextId = 1;
+    }
+}
+async function saveTasks() {
+    await fs.writeFile(dataFile, JSON.stringify({ tasks, nextId }, null, 2), 'utf8');
+}
 server.registerTool('ping', {
     description: 'Health check tool that returns pong'
 }, async () => {
@@ -19,18 +43,38 @@ server.registerTool('ping', {
         ]
     };
 });
+// Add task
 server.registerTool('add-task', {
-    description: 'Task description'
-}, async (args) => {
-    const task = {
-        id: nextId++,
-        text: args.text,
-        done: false
-    };
+    description: 'Add a task',
+    inputSchema: {
+        text: z.string().describe('Task description')
+    }
+}, async ({ text }) => {
+    const task = { id: nextId++, text, done: false };
     tasks.push(task);
-    return `Added task: ${task.text}`;
+    await saveTasks();
+    return {
+        content: [{ type: 'text', text: `Added task: ${task.text}` }]
+    };
+});
+// List tasks
+server.registerTool('list-tasks', {
+    description: 'Show all tasks'
+}, async () => {
+    if (tasks.length === 0) {
+        return {
+            content: [{ type: 'text', text: 'No tasks yet' }]
+        };
+    }
+    const list = tasks
+        .map((t) => `${t.id}. [${t.done ? '✅' : '⭐'}] ${t.text}`)
+        .join('\n');
+    return {
+        content: [{ type: 'text', text: list }]
+    };
 });
 async function main() {
+    await loadTasks();
     const transport = new StdioServerTransport();
     await server.connect(transport);
     console.error('MCP server running on stdio');

@@ -1,0 +1,15 @@
+{
+  "tasks": [
+    {
+      "id": 1,
+      "text": "Go to the doctor (Tuesday, October 27, 2026)",
+      "done": false
+    },
+    {
+      "id": 2,
+      "text": "Take the dog to the groomers (Tuesday, October 27, 2026)",
+      "done": false
+    }
+  ],
+  "nextId": 3
+}
