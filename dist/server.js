@@ -8,7 +8,7 @@ const server = new McpServer({
     name: 'task-mcp-server',
     version: '1.0.0'
 });
-// Persisted storage (falls back to in-memory if file is missing/corrupt)
+// Persisted storage
 let tasks = [];
 let nextId = 1;
 const __filename = fileURLToPath(import.meta.url);
@@ -71,6 +71,46 @@ server.registerTool('list-tasks', {
         .join('\n');
     return {
         content: [{ type: 'text', text: list }]
+    };
+});
+// Complete a task
+server.registerTool('complete-task', {
+    description: 'Mark a task as done',
+    inputSchema: {
+        id: z.number().int().positive().describe('Task id to mark complete')
+    }
+}, async ({ id }) => {
+    const task = tasks.find((t) => t.id === id);
+    if (!task) {
+        return {
+            content: [{ type: 'text', text: `Task ${id} not found` }],
+            isError: true
+        };
+    }
+    task.done = true;
+    await saveTasks();
+    return {
+        content: [{ type: 'text', text: `Completed task: ${task.text}` }]
+    };
+});
+// Reopen a task
+server.registerTool('reopen-task', {
+    description: 'Set task as not done',
+    inputSchema: {
+        id: z.number().int().positive().describe('Task id to mark as not done')
+    }
+}, async ({ id }) => {
+    const task = tasks.find((t) => t.id === id);
+    if (!task) {
+        return {
+            content: [{ type: 'text', text: `Task ${id} not found` }],
+            isError: true
+        };
+    }
+    task.done = false;
+    await saveTasks();
+    return {
+        content: [{ type: 'text', text: `Not completed task: ${task.text}` }]
     };
 });
 async function main() {

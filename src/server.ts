@@ -98,6 +98,78 @@ server.registerTool(
   }
 );
 
+// Complete a task
+server.registerTool(
+  'complete-task',
+  {
+    description: 'Mark a task as done',
+    inputSchema: {
+      id: z.number().int().positive().describe('Task id to mark complete')
+    }
+  },
+  async ({ id }) => {
+    const task = tasks.find((t) => t.id === id);
+
+    if (!task) {
+      return {
+        content: [{ type: 'text', text: `Task ${id} not found` }],
+        isError: true
+      };
+    }
+
+    task.done = true;
+    await saveTasks();
+
+    return {
+      content: [{ type: 'text', text: `Completed task: ${task.text}` }]
+    };
+  }
+);
+
+// Reopen a task
+server.registerTool(
+    'reopen-task',
+    {
+      description: 'Set task as not done',
+      inputSchema: {
+        id: z.number().int().positive().describe('Task id to mark as not done')
+      }
+    },
+    async ({ id }) => {
+      const task = tasks.find((t) => t.id === id);
+
+      if (!task) {
+        return {
+          content: [{ type: 'text', text: `Task ${id} not found` }],
+          isError: true
+        };
+      }
+
+      task.done = false;
+      await saveTasks();
+
+      return {
+        content: [{ type: 'text', text: `Reopened task: ${task.text}` }]
+      };
+    }
+);
+
+// Clear completed tasks
+server.registerTool(
+    'clear-completed',
+    {
+      description: 'Remove all completed tasks.'
+    },
+    async () => {
+      const completedCount = tasks.filter(t => t.done).length;
+      tasks = tasks.filter(t => !t.done);
+
+      return {
+        content: [{ type: 'text', text: `Cleared ${completedCount} completed tasks`}]
+      };
+    }
+);
+
 async function main() {
   await loadTasks();
   const transport = new StdioServerTransport();
